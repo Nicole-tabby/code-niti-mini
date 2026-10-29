@@ -28,7 +28,7 @@ code-niti-mini/
    pip install -r requirements.txt
    ```
 
-3. Copy `.env.example` to `.env`. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and put it in `GOOGLE_API_KEY` (never commit `.env`). The app uses Google's OpenAI-compatible endpoint and `gemini-3.8-flash`; you can change the endpoint and model in `.env`.
+3. Copy `.env.example` to `.env`. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey) and put it in `GOOGLE_API_KEY` (never commit `.env`). Google is tried first. To enable fallback, add a Groq key as `GROQ_API_KEY`. If Google's request fails, the app automatically tries Groq. Configure each provider's endpoint and model separately in `.env`.
 4. Start the app:
 
    ```powershell
@@ -42,11 +42,11 @@ code-niti-mini/
 1. **UI:** run Streamlit and see the repository input.
 2. **Loading:** index a small public repository; inspect supported file counts.
 3. **Embeddings and FAISS:** local model turns chunks into vectors and FAISS finds similar chunks.
-4. **Generation:** the selected LLM answers from retrieved snippets and shows its sources.
+4. **Generation and fallback:** Gemini answers from retrieved snippets first; if its request fails and a Groq key is configured, Groq is tried next. The UI identifies which provider answered and shows the retrieved sources.
 
 ## Sharing it
 
-For a public hosted app, deploy the code to a hosting service and configure `GOOGLE_API_KEY`, `LLM_BASE_URL`, and `LLM_MODEL` as that app's private secrets. Visitors then use the app without entering their own key. Calls consume the operator's provider quota and are subject to Google's current plan limits and pricing; check the current terms before sharing widely. See Google's [OpenAI compatibility guide](https://ai.google.dev/gemini-api/docs/openai) and [model list](https://ai.google.dev/gemini-api/docs/models).
+For a public hosted app, deploy the code to a hosting service and configure `GOOGLE_API_KEY` and optionally `GROQ_API_KEY` as private secrets. Visitors then use the app without entering their own keys. Calls consume the operator's provider quota and are subject to each provider's current limits and pricing; check the current terms before sharing widely. See Google's [OpenAI compatibility guide](https://ai.google.dev/gemini-api/docs/openai) and Groq's [OpenAI compatibility guide](https://console.groq.com/docs/openai).
 
 No provider key means the app can still index and retrieve locally, but hosted LLM answers will not run. A fully local model (for example through Ollama) can avoid a paid API, but a public website cannot use a visitor's computer to run the model; the server operator must run and pay the hardware cost. We can add local Ollama support as a later lesson.
 

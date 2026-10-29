@@ -43,23 +43,59 @@ if index_button:
                 st.session_state.retriever = build_index(documents)
             st.session_state.repo_url = repo_url
             st.session_state.revision = revision
-            st.success(f"Indexed {len(documents)} files ({revision[:12]}). Ask away!")
+            st.session_state.indexed_file_count = len(documents)
+            st.session_state.index_notice = True
     except Exception as exc:  # Show actionable errors in the UI.
         st.error(str(exc))
 
 if "retriever" in st.session_state:
     st.info(f"Repository: {st.session_state.repo_url} · revision {st.session_state.revision[:12]}")
-    question = st.text_input("Your question", placeholder="Where is authentication handled?")
+    if st.session_state.get("index_notice"):
+        st.success(f"Repository successfully indexed ({st.session_state.indexed_file_count} files). Please proceed to ask a question.")
+
+    st.markdown("**Not sure what to ask? Try one of these:**")
+    suggestions = [
+        "What does this project do?",
+        "Where is the main entry point?",
+        "What are the main dependencies?",
+        "Where are tests located?",
+    ]
+    suggestion_columns = st.columns(2)
+    for position, suggestion in enumerate(suggestions):
+        if suggestion_columns[position % 2].button(suggestion, key=f"suggestion_{position}", use_container_width=True):
+            st.session_state.question_input = suggestion
+
+    question = st.text_input("Your question", placeholder="Where is authentication handled?", key="question_input")
     if st.button("Get answer") and question.strip():
-        api_key = setting("GOOGLE_API_KEY") or setting("LLM_API_KEY")
-        base_url = setting("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/")
-        model = setting("LLM_MODEL", "gemini-3.8-flash")
-        if not api_key:
-            st.warning("Retrieval is ready, but no GOOGLE_API_KEY is configured. Add one to your local .env or deployment secrets to generate answers.")
+        providers = []
+        google_key = setting("GOOGLE_API_KEY") or setting("LLM_API_KEY")
+        groq_key = setting("GROQ_API_KEY")
+        if google_key:
+            providers.append({
+                "name": "Google Gemini",
+                "api_key": google_key,
+                "base_url": setting("GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com/v1beta/openai/"),
+                "model": setting("GOOGLE_MODEL", "gemini-3.8-flash"),
+            })
+        if groq_key:
+            providers.append({
+                "name": "Groq",
+                "api_key": groq_key,
+                "base_url": setting("GROQ_BASE_URL", "https://api.groq.com/openai/v1"),
+                "model": setting("GROQ_MODEL", "openai/gpt-oss-20b"),
+            })
+        if not providers:
+            st.warning("Retrieval is ready, but no LLM key is configured. Add GOOGLE_API_KEY, GROQ_API_KEY, or both to your local .env or deployment secrets to generate answers.")
         else:
             with st.spinner("Searching the repository and writing an answer…"):
                 try:
-                    answer, sources = answer_question(question, st.session_state.retriever, api_key, base_url, model)
+                    answer, sources, provider_name, fallback_message = answer_question(
+                        question, st.session_state.retriever, providers
+                    )
+                    if fallback_message:
+                        st.info(f"Google Gemini was unavailable, so this answer came from {provider_name}.")
+                    else:
+                        st.caption(f"Answered with {provider_name}.")
                     st.markdown(answer)
                     with st.expander("Sources used"):
                         for source in sources:
